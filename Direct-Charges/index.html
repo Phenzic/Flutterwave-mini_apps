@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="./styles.css"/>
+    <title>Flutterwave Card Payment</title>
+</head>
+<body>
+    <div class="container">
+      <h1>Flutterwave Card Payment</h1>
+      <form id="paymentForm">
+        <input type="text" name="card_number" placeholder="Card Number" >
+        <input type="text" name="cvv" placeholder="CVV" >
+        <input type="text" name="expiry_month" placeholder="Expiry Month" >
+        <input type="text" name="expiry_year" placeholder="Expiry Year" >
+        <input type="email" name="email" placeholder="Email" >
+        <input type="text" name="fullname" placeholder="Full Name" >
+        <input type="tel" name="phone_number" placeholder="Phone Number" >
+        <button type="submit">Pay Now</button>
+      </form>
+
+      <div id="authForm" style="display: none;">
+        <h2>Additional Authorization Required</h2>
+        <form id="additionalAuthForm">
+          <div id="pinAuth" style="display: none;">
+            <input type="password" name="pin" placeholder="Enter PIN" >
+          </div>
+          <div id="otpAuth" style="display: none;">
+            <input type="text" name="otp" placeholder="Enter OTP" >
+          </div>
+          <button type="submit">Complete Payment</button>
+        </form>
+      </div>
+
+      <div id="response"></div>
+    </div>
+
+    <script>
+        let currentFlwRef = '';
+        let currentAuthMode = '';
+        let currentTxRef = '';
+
+        document.getElementById('paymentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const payload = Object.fromEntries(formData);
+
+            try {
+                const response = await fetch('/charge-card', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+                handleChargeResponse(result);
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        });
+
+        function handleChargeResponse(result) {
+            if (result.status === 'pin_required') {
+                currentFlwRef = result.flw_ref;
+                currentTxRef = result.tx_ref;
+                currentAuthMode = 'pin';
+                showAuthForm(currentAuthMode);
+            } else if (result.status === 'redirect_required') {
+                // Automatically redirect to the OTP page
+                window.location.href = result.url;
+            } else if (result.status === 'success') {
+                document.getElementById('response').innerText = 'Payment successful!';
+            } else {
+                document.getElementById('response').innerText = 'Payment failed. Please try again.';
+            }
+        }
+
+        function showAuthForm(authMode) {
+            document.getElementById('authForm').style.display = 'block';
+            document.getElementById('pinAuth').style.display = authMode === 'pin' ? 'block' : 'none';
+            document.getElementById('otpAuth').style.display = authMode === 'otp' ? 'block' : 'none';
+        }
+
+        document.getElementById('additionalAuthForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const authData = Object.fromEntries(formData);
+
+            try {
+                if (currentAuthMode === 'pin') {
+                    const response = await fetch('/complete-charge', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            authMode: 'pin',
+                            pin: authData.pin,
+                        })
+                    });
+                    const result = await response.json();
+                    currentFlwRef = result.data.data.flw_ref;
+                    currentTxRef = result.data.data.tx_ref;
+                    if (result.status === 'success' && result.data.data.status === 'pending') {
+                        currentAuthMode = 'otp';
+                        showAuthForm('otp');
+                    } else if (result.status === 'success' && result.data.data.status === 'successful') {
+                        document.getElementById('response').innerText = 'Payment successful!';
+                        document.getElementById('authForm').style.display = 'none';
+                    } else {
+                        document.getElementById('response').innerText = 'PIN validation failed. Please try again.';
+                    }
+                } else if (currentAuthMode === 'otp') {
+                    const response = await fetch('/validate-charge', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            otp: authData.otp,
+                            flw_ref: currentFlwRef
+                        })
+                    });
+                    const result = await response.json();
+                    if (result.status === 'success') {
+                        document.getElementById('response').innerText = 'Payment successful!';
+                        document.getElementById('authForm').style.display = 'none';
+                    } else {
+                        document.getElementById('response').innerText = 'OTP validation failed. Please try again.';
+                    }
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('response').innerText = 'An error occurred. Please try again.';
+            }
+        });
+    </script>
+</body>
+</html>
