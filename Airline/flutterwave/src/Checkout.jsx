@@ -60,7 +60,7 @@ export default function Checkout() {
     setLoading(true);
     try {
       // Create payment plan
-      const paymentPlanResponse = await fetch('http://localhost:5000/api/payment', {
+      const paymentPlanResponse = await fetch('http://localhost:5570/api/payment', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -92,7 +92,7 @@ export default function Checkout() {
         payment_plan: paymentPlanData.data.id // Use the payment plan ID from the response
       };
 
-      const subscriptionResponse = await fetch('http://localhost:5000/api/subscription', {
+      const subscriptionResponse = await fetch('http://localhost:5570/api/subscription', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -107,7 +107,7 @@ export default function Checkout() {
       }
 
       // Activate subscription
-      const activationResponse = await fetch('http://localhost:5000/api/subscription/activate', {
+      const activationResponse = await fetch('http://localhost:5570/api/subscription/activate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
